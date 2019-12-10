@@ -1,26 +1,7 @@
 use crate::formats::photons::data::*;
+use crate::parse_rgb565::parse_rgb565_image;
 use image::{ImageBuffer, Rgb, RgbImage};
 use nom::{number::complete::*, sequence::tuple, IResult};
-
-fn upscale_5bit_to_8bit(input: u8) -> u8 {
-    (input << 3) | (input >> 2)
-}
-
-fn upscale_6bit_to_8bit(input: u8) -> u8 {
-    (input << 2) | (input >> 4)
-}
-
-fn parse_photons_thumbnail_pixel(input: &[u8]) -> IResult<&[u8], Rgb<u8>> {
-    let (input, data) = le_u16(input)?;
-    Ok((
-        input,
-        Rgb([
-            upscale_5bit_to_8bit((data & 0x1F) as u8),
-            upscale_6bit_to_8bit(((data >> 5) & 0x3F) as u8),
-            upscale_5bit_to_8bit(((data >> 11) & 0x1F) as u8),
-        ]),
-    ))
-}
 
 fn parse_photons_thumbnail(input: &[u8]) -> IResult<&[u8], RgbImage> {
     let (input, (width, unk1, height, unk2)) = tuple((be_u32, be_u32, be_u32, be_u32))(input)?;
@@ -28,10 +9,7 @@ fn parse_photons_thumbnail(input: &[u8]) -> IResult<&[u8], RgbImage> {
         println!("Unknowns in thumbnail unexpected: {} {}", unk1, unk2);
         return Err(nom::Err::Failure((input, nom::error::ErrorKind::Verify)));
     }
-    let (input, pixels) =
-        nom::multi::count(parse_photons_thumbnail_pixel, (width * height) as usize)(input)?;
-    let pixels: Vec<u8> = pixels.iter().flat_map(|p| p.0.iter()).cloned().collect();
-    Ok((input, ImageBuffer::from_vec(width, height, pixels).unwrap()))
+    parse_rgb565_image(width, height, input)
 }
 
 fn parse_photons_layer(input: &[u8]) -> IResult<&[u8], PhotonsLayer> {

@@ -2,9 +2,11 @@ extern crate image;
 extern crate nom;
 
 mod formats;
+mod parse_rgb565;
 
 use crate::formats::photons;
-use image::{ImageBuffer, Pixel, Rgb, RgbImage};
+use crate::formats::pws;
+use image::{GrayImage, ImageBuffer, Pixel, Rgb, RgbImage};
 use nom::{number::complete::*, sequence::tuple, IResult};
 use std::fmt::Display;
 use std::fs::File;
@@ -37,47 +39,52 @@ impl RLEBits {
 */
 
 fn main() -> std::io::Result<()> {
-    let mut file = File::open("example_files/ArnoldOrczenegger.photons")?;
+    let mut file = File::open("example_files/ArnoldOrczenegger_v2.pws")?;
     let mut contents = Vec::new();
     let len = file.read_to_end(&mut contents)?;
     println!("Length: {}", len);
-    let result = photons::parse::parse_photons_file(&contents);
+    let result = pws::parse::parse_pws_file(&contents);
     if let Ok((remaining, result)) = result {
         println!("Bytes remaining: {}", remaining.len());
-        result.thumbnail.save("thumbnail.png").unwrap();
-        println!("Num layers: {:?}", result.layers.len());
+        println!("Header: {:?}", result.header);
+        let image_size: usize = result.header.width as usize * result.header.height as usize;
         for (index, layer) in result.layers.iter().enumerate() {
             println!("Layer {}...", index);
-            let len = (layer.width * layer.height) as usize;
-            let decompressed = layer.data.decompress(len);
-            let decompressed_u8: Vec<u8> = decompressed
-                .iter()
-                .map(|v| if *v { 255 } else { 0 })
-                .collect();
-            let recompressed = photons::data::CompressedBitstream::compress(&decompressed);
+            let decompressed = layer.data.decompress();
+            let recompressed = pws::data::CompressedBitstream::compress(&decompressed, image_size);
             if layer.data != recompressed {
-                println!("Recompression failure at layer {}", index);
-                layer
-                    .data
-                    .debug_out(&mut File::create(format!("layer{}.pre.txt", index)).unwrap())
-                    .unwrap();
-                recompressed
-                    .debug_out(&mut File::create(format!("layer{}.post.txt", index)).unwrap())
-                    .unwrap();
+                println!("Mismatch! {} {}", layer.data.0.len(), recompressed.0.len());
                 File::create(format!("layer{}.pre.bin", index))
                     .unwrap()
-                    .write_all(&layer.data.data)
+                    .write_all(&layer.data.0)
                     .unwrap();
                 File::create(format!("layer{}.post.bin", index))
                     .unwrap()
-                    .write_all(&recompressed.data)
+                    .write_all(&recompressed.0)
                     .unwrap();
-                File::create(format!("layer{}.data.bin", index))
-                    .unwrap()
-                    .write_all(&decompressed_u8)
-                    .unwrap();
+                break;
             }
         }
+    /*
+    for index in 359..360 {
+        let layer = &result.layers[index];
+        let data = layer.data.decompress();
+        let mut pixels = vec![0;image_size];
+        for pixel_index in 1..image_size {
+            let mut count : usize = 0;
+            for bit in 0..result.header.bits_per_pixel as usize {
+                if data[pixel_index + (bit * image_size)] {
+                    count += 1;
+                }
+            }
+            count *= 255;
+            count /= result.header.bits_per_pixel as usize;
+            pixels[pixel_index] = (count & 0xFF) as u8;
+        }
+        let img = GrayImage::from_vec(result.header.width, result.header.height, pixels).unwrap();
+        img.save(format!("layer{}.png", index)).unwrap();
+    }
+    */
     } else {
         println!("Some kind of error parsing :(");
     }
