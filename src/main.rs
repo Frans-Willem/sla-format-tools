@@ -116,8 +116,16 @@ fn parse_photons_layer(input: &[u8]) -> IResult<&[u8], PhotonsLayer> {
         println!("Unknowns in layer unexpected: {:X}", unknown1);
         return Err(nom::Err::Failure((input, nom::error::ErrorKind::Verify)));
     }
-    if width_revbits.reverse_bits() as u32 != width || height_revbits.reverse_bits() as u32 != height {
-        println!("Reverse-bit fields invalid: {:X} != {:X} or {:X} != {:X}", width, width_revbits.reverse_bits(), height, height_revbits.reverse_bits());
+    if width_revbits.reverse_bits() as u32 != width
+        || height_revbits.reverse_bits() as u32 != height
+    {
+        println!(
+            "Reverse-bit fields invalid: {:X} != {:X} or {:X} != {:X}",
+            width,
+            width_revbits.reverse_bits(),
+            height,
+            height_revbits.reverse_bits()
+        );
         return Err(nom::Err::Failure((input, nom::error::ErrorKind::Verify)));
     }
     let (input, data) = nom::bytes::complete::take((total_size - 32) / 8)(input)?;
