@@ -2,7 +2,7 @@ use image::RgbImage;
 
 #[derive(Debug)]
 pub struct PwsHeader {
-    pub pixel_size: f32,           // in mm
+    pub pixel_size: f32,           // in um
     pub layer_height: f32,         // in mm
     pub exposure_time: f32,        // in sec
     pub off_time: f32,             // in sec

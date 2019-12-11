@@ -1,10 +1,13 @@
 extern crate cookie_factory;
 extern crate image;
 extern crate nom;
+//extern crate zip;
+//
 
-mod formats;
-mod parse_rgb565;
+pub mod formats;
+pub mod parse_rgb565;
 
+/*
 use crate::formats::photons;
 use crate::formats::pws;
 use image::{GrayImage, ImageBuffer, Pixel, Rgb, RgbImage};
@@ -51,3 +54,4 @@ fn main() -> std::io::Result<()> {
 
     Ok(())
 }
+*/
