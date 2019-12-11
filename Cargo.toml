@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 nom = "5"
+cookie-factory = "0.3"
 image = "0.22"
