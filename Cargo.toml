@@ -1,5 +1,5 @@
 [package]
-name = "SLAFormatConverter"
+name = "sla_format_tools"
 version = "0.1.0"
 authors = ["Frans-Willem Hardijzer <fw@hardijzer.nl>"]
 edition = "2018"
@@ -12,3 +12,4 @@ cookie-factory = "0.3"
 image = "0.22"
 zip = "0.5"
 rust-ini = "0.13"
+clap = "2.33"

@@ -1,14 +1,57 @@
+use clap::{App, Arg, crate_version};
 use image::{Rgb, RgbImage};
 use ini;
 use std::fs::File;
 use std::io::Read;
 use zip;
-use SLAFormatConverter::formats::pws;
-//use rust_ini::ini;
+use sla_format_tools::formats::pws;
 
-fn main() -> std::io::Result<()> {
-    let f = File::open("example_files/ArnoldOrczenegger_v2.sl1").unwrap();
-    let mut z = zip::read::ZipArchive::new(f).unwrap();
+fn check_antialias_arg(input: String) -> Result<(), String> {
+    match input.as_ref() {
+        "1" | "2" | "4" | "8" => Ok(()),
+        _ => Err("Invalid anti-alias option, allowed values are 1, 2, 4, or 8".to_string())
+    }
+}
+
+fn main() {
+    let args = App::new("SL1 to PWS converter")
+        .version(crate_version!())
+        .author("Frans-willem Hardijzer <fw@hardijzer.nl>")
+        .about("Converts Prusa SL1 (.sl1) files to Anycubic Photon (S) (.pws) files")
+        .arg(
+            Arg::with_name("input")
+                .short("i")
+                .long("input")
+                .value_name("FILE")
+                .help("Input .sl1 file")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .value_name("FILE")
+                .help("Output .pws file")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("antialias")
+                .short("a")
+                .long("antialias")
+                .value_name("AA")
+                .default_value("1")
+                .validator(check_antialias_arg)
+                .help("Anti-aliasing levels"),
+        )
+        .get_matches();
+
+    let input_fname = args.value_of("input").unwrap();
+    let output_fname = args.value_of("output").unwrap();
+    let bits_per_pixel = args.value_of("antialias").unwrap().parse::<u32>().unwrap();
+
+    let mut z = zip::read::ZipArchive::new(File::open(input_fname).unwrap()).unwrap();
     let config = ini::Ini::read_from(&mut z.by_name("config.ini").unwrap()).unwrap();
 
     println!("Properties:");
@@ -40,10 +83,10 @@ fn main() -> std::io::Result<()> {
         bottom_exposure_time: exposure_time_first,
         num_bottom_layers: (num_slow + num_fade) as f32,
         lift_distance: 6.0,
-        lift_speed: 3.0,
+        lift_speed: 1.5,
         drop_speed: 3.0,
         volume: 0.0,
-        bits_per_pixel: 4,
+        bits_per_pixel: bits_per_pixel,
         width: 1440,
         height: 2560,
         weight: 0.0,
@@ -51,7 +94,7 @@ fn main() -> std::io::Result<()> {
         resin_type: 36,
         use_individual_parameters: true,
     };
-    let preview = RgbImage::from_pixel(244, 168, Rgb([0, 0, 0]));
+    let preview = RgbImage::from_pixel(224, 168, Rgb([0, 0, 0]));
     let mut layers: Vec<pws::data::PwsLayer> = Vec::new();
     for index in 0..num_total {
         println!("Layer {}...", index);
@@ -110,7 +153,9 @@ fn main() -> std::io::Result<()> {
         preview,
         layers,
     };
-    let f = File::create("converted.pws").unwrap();
-    let f = cookie_factory::gen(pws::gen::gen_pws_file(&pws_file), f).unwrap();
-    Ok(())
+    cookie_factory::gen(
+        pws::gen::gen_pws_file(&pws_file),
+        File::create(output_fname).unwrap(),
+    )
+    .unwrap();
 }
