@@ -21,7 +21,7 @@ pub struct PwsHeader {
     pub use_individual_parameters: bool,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct CompressedBitstream(pub Vec<u8>);
 
 pub struct PwsLayer {
@@ -39,6 +39,10 @@ pub struct PwsFile {
 }
 
 impl CompressedBitstream {
+    pub fn new() -> CompressedBitstream {
+        CompressedBitstream(Vec::new())
+    }
+
     pub fn decompress(&self) -> Vec<bool> {
         let mut output = Vec::new();
         for v in self.0.iter() {
@@ -52,33 +56,46 @@ impl CompressedBitstream {
         output
     }
 
-    pub fn compress(bitstream: &[bool], boundary: usize) -> CompressedBitstream {
-        let mut index: usize = 0;
-        let mut data: Vec<u8> = Vec::new();
-        while index < bitstream.len() {
-            let value = bitstream[index];
-            index += 1;
-            let mut repeat: u8 = 1;
-            while index < bitstream.len()
-                && repeat < 125
-                && bitstream[index] == value
-                && index % boundary != 0
-            {
-                repeat += 1;
-                index += 1;
-            }
-            // Don't ask. Only such that recompressing Anycubic Photon Workshop files end up with
-            // identical files.
-            if repeat == 125
-                && index < bitstream.len()
-                && bitstream[index] == value
-                && (index + 1) % boundary == 0
-            {
-                repeat += 1;
-                index += 1;
-            }
-            data.push(repeat | if value { 0x80 } else { 0 });
-        }
-        CompressedBitstream(data)
+    pub fn compress<B : Iterator<Item = bool>>(bitstream: B) -> CompressedBitstream {
+        let mut x = CompressedBitstream::new();
+        x.compress_append(bitstream);
+        x
     }
+
+    pub fn compress_append<B : Iterator<Item = bool>>(&mut self, bitstream: B) {
+        let mut previous_value = false;
+        let mut previous_count = 0;
+        let mut bitstream = bitstream;
+        while let Some(value) = bitstream.next() {
+            if previous_value != value {
+                if previous_count > 0 {
+                    self.0.push(previous_count | if previous_value { 0x80 } else { 0});
+                }
+                previous_value = value;
+                previous_count = 1;
+            } else {
+                if previous_count > 125 {
+                    self.0.push(125 | if previous_value { 0x80 } else { 0});
+                    previous_count -= 125;
+                }
+                previous_count += 1;
+            }
+        }
+        if previous_count > 0 {
+            self.0.push(previous_count | if previous_value { 0x80 } else { 0});
+        }
+    }
+}
+
+#[test]
+fn test_decompress_compress() {
+    // These tests check if the last byte is allowed to repeat 126 times, whereas all others only
+    // 125 times (no idea why anycubic does this).
+    let input = CompressedBitstream(vec![0x80 | 126]);
+    let recompressed = CompressedBitstream::compress(input.decompress().into_iter());
+    assert_eq!(input, recompressed);
+    let input = CompressedBitstream(vec![0x80 | 125, 125, 126]);
+    let recompressed = CompressedBitstream::compress(input.decompress().into_iter());
+    assert_eq!(input, recompressed);
+
 }
