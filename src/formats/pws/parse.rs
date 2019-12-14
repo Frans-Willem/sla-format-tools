@@ -1,6 +1,6 @@
 use crate::formats::pws::data::*;
 use crate::parse_rgb565::parse_rgb565_image;
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::RgbImage;
 use nom::bytes::complete::tag;
 use nom::{number::complete::*, sequence::tuple, IResult};
 
@@ -167,7 +167,7 @@ pub fn parse_pws_file(input: &[u8]) -> IResult<&[u8], PwsFile> {
             reserved2,
             layerdef_addr,
             reserved3,
-            layers_addr,
+            _layers_addr,
         ),
     ) = tuple((
         tag("ANYCUBIC\0\0\0\0"),

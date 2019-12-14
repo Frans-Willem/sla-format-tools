@@ -1,12 +1,13 @@
 use clap::{crate_version, App, Arg};
-use image::{Rgb, RgbImage, GrayImage};
+use image::{GrayImage, Rgb, RgbImage};
 use ini;
+use pbr::ProgressBar;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use sla_format_tools::formats::pws;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use zip;
 
 fn check_antialias_arg(input: String) -> Result<(), String> {
@@ -16,7 +17,18 @@ fn check_antialias_arg(input: String) -> Result<(), String> {
     }
 }
 
-fn iterate_sl1_layers(sl1file: zip::read::ZipArchive<File>, job_dir: String, num_layers: usize) -> impl IndexedParallelIterator<Item = GrayImage> {
+fn check_parse_arg<T: std::str::FromStr>(input: String) -> Result<(), String>
+where
+    T::Err: std::string::ToString,
+{
+    input.parse::<T>().map(drop).map_err(|e| e.to_string())
+}
+
+fn iterate_sl1_layers(
+    sl1file: zip::read::ZipArchive<File>,
+    job_dir: String,
+    num_layers: usize,
+) -> impl IndexedParallelIterator<Item = GrayImage> {
     let sl1file = Mutex::new(sl1file);
     let layer_indices = (0..num_layers).into_par_iter();
     // Reading into Vec<u8>, with lock on ZipArchive
@@ -52,26 +64,19 @@ fn convert_sl1_layers(
     num_fade: usize,
 ) -> (HashSet<(u32, u32)>, Vec<pws::data::PwsLayer>) {
     let layer_images = iterate_sl1_layers(sl1file, job_dir, num_layers);
+    let pb = Mutex::new(ProgressBar::new(num_layers as u64));
+    pb.lock().unwrap().message("Converting layers: ");
     let layer_compressed = layer_images.enumerate().map(|(index, image)| {
-        println!("Compressing layer {}", index);
-        let thresholds = (0..bits_per_pixel).map(|bit| {
-            let threshold = (bit * 256) / bits_per_pixel;
-            let threshold = threshold + (256 / (bits_per_pixel * 2));
-            threshold
-        });
-        let mut compressed = pws::data::CompressedBitstream::new();
-        for threshold in thresholds {
-            let bitstream = image.pixels().map(|p| p.0[0] as usize >= threshold);
-            compressed.compress_append(bitstream);
-        }
+        let data = pws::data::CompressedBitstream::from_image(&image, bits_per_pixel);
         let exposure_time = if index < num_slow {
             bottom_exposure_time
         } else if index < (num_slow + num_fade) {
             let fade: f32 = (index - num_slow) as f32 / num_fade as f32;
-            (exposure_time * fade) + (bottom_exposure_time * (1.0 - fade))
+            exposure_time.mul_add(fade, bottom_exposure_time * (1.0 - fade))
         } else {
             exposure_time
         };
+        pb.lock().unwrap().inc();
         (
             (image.width(), image.height()),
             pws::data::PwsLayer {
@@ -79,12 +84,13 @@ fn convert_sl1_layers(
                 lift_speed,
                 exposure_time,
                 layer_height,
-                data: compressed,
+                data,
             },
         )
     });
     let (layer_sizes, layer_compressed) = layer_compressed
         .unzip::<(u32, u32), pws::data::PwsLayer, HashSet<(u32, u32)>, Vec<pws::data::PwsLayer>>();
+    pb.lock().unwrap().finish_print("Done");
     (layer_sizes, layer_compressed)
 }
 
@@ -97,7 +103,7 @@ fn main() {
             Arg::with_name("input")
                 .short("i")
                 .long("input")
-                .value_name("FILE")
+                .value_name("filename")
                 .help("Input .sl1 file")
                 .required(true)
                 .takes_value(true),
@@ -106,7 +112,7 @@ fn main() {
             Arg::with_name("output")
                 .short("o")
                 .long("output")
-                .value_name("FILE")
+                .value_name("filename")
                 .help("Output .pws file")
                 .required(true)
                 .takes_value(true),
@@ -115,10 +121,37 @@ fn main() {
             Arg::with_name("antialias")
                 .short("a")
                 .long("antialias")
-                .value_name("AA")
-                .default_value("1")
+                .value_name("bpp")
+                .default_value("4")
                 .validator(check_antialias_arg)
                 .help("Anti-aliasing levels"),
+        )
+        .arg(
+            Arg::with_name("lift-distance")
+                .short("l")
+                .long("lift-distance")
+                .value_name("mm")
+                .default_value("6.0")
+                .validator(check_parse_arg::<f32>)
+                .help("Lift distance after layers in millimeter"),
+        )
+        .arg(
+            Arg::with_name("lift-speed")
+                .short("s")
+                .long("lift-speed")
+                .value_name("mm/sec")
+                .default_value("1.5")
+                .validator(check_parse_arg::<f32>)
+                .help("Lift speed in millimeter per second"),
+        )
+        .arg(
+            Arg::with_name("drop-speed")
+                .short("d")
+                .long("drop-speed")
+                .value_name("mm/sec")
+                .default_value("2.5")
+                .validator(check_parse_arg::<f32>)
+                .help("Drop speed in millimeter per second"),
         )
         .get_matches();
 
@@ -129,19 +162,10 @@ fn main() {
     let mut z = zip::read::ZipArchive::new(File::open(input_fname).unwrap()).unwrap();
     let config = ini::Ini::read_from(&mut z.by_name("config.ini").unwrap()).unwrap();
 
-    println!("Properties:");
-    for (key, value) in config.general_section().iter() {
-        println!("{} => {}", key, value)
-    }
-
     let num_slow = config.general_section()["numSlow"].parse::<u32>().unwrap();
     let num_fast = config.general_section()["numFast"].parse::<u32>().unwrap();
     let num_fade = config.general_section()["numFade"].parse::<u32>().unwrap();
     let num_total = num_slow + num_fast;
-    println!(
-        "Num layers: {}, Slow: {}, Fade: {}",
-        num_total, num_slow, num_fade
-    );
     let exposure_time = config.general_section()["expTime"].parse::<f32>().unwrap();
     let exposure_time_first = config.general_section()["expTimeFirst"]
         .parse::<f32>()
@@ -149,9 +173,14 @@ fn main() {
     let layer_height = config.general_section()["layerHeight"]
         .parse::<f32>()
         .unwrap();
-    let lift_distance = 6.0;
-    let lift_speed = 1.5;
-    let drop_speed = 3.0;
+
+    let lift_distance = args
+        .value_of("lift-distance")
+        .unwrap()
+        .parse::<f32>()
+        .unwrap();
+    let lift_speed = args.value_of("lift-speed").unwrap().parse::<f32>().unwrap();
+    let drop_speed = args.value_of("drop-speed").unwrap().parse::<f32>().unwrap();
 
     let preview = RgbImage::from_pixel(224, 168, Rgb([0, 0, 0]));
     let (sizes, layers) = convert_sl1_layers(

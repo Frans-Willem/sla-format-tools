@@ -1,4 +1,4 @@
-use image::RgbImage;
+use image::{GrayImage, RgbImage};
 
 #[derive(Debug)]
 pub struct PwsHeader {
@@ -38,16 +38,18 @@ pub struct PwsFile {
     pub layers: Vec<PwsLayer>,
 }
 
-impl CompressedBitstream {
-    pub fn new() -> CompressedBitstream {
+impl Default for CompressedBitstream {
+    fn default() -> CompressedBitstream {
         CompressedBitstream(Vec::new())
     }
+}
 
+impl CompressedBitstream {
     pub fn decompress(&self) -> Vec<bool> {
         let mut output = Vec::new();
         for v in self.0.iter() {
             let value = (*v & 0x80) != 0;
-            let mut repeat = (*v & 0x7F);
+            let mut repeat = *v & 0x7F;
             while repeat > 0 {
                 repeat -= 1;
                 output.push(value);
@@ -56,34 +58,79 @@ impl CompressedBitstream {
         output
     }
 
-    pub fn compress<B : Iterator<Item = bool>>(bitstream: B) -> CompressedBitstream {
-        let mut x = CompressedBitstream::new();
+    pub fn compress<B: Iterator<Item = bool>>(bitstream: B) -> CompressedBitstream {
+        let mut x = CompressedBitstream::default();
         x.compress_append(bitstream);
         x
     }
 
-    pub fn compress_append<B : Iterator<Item = bool>>(&mut self, bitstream: B) {
+    pub fn compress_append<B: Iterator<Item = bool>>(&mut self, bitstream: B) {
         let mut previous_value = false;
         let mut previous_count = 0;
-        let mut bitstream = bitstream;
-        while let Some(value) = bitstream.next() {
+        for value in bitstream {
             if previous_value != value {
-                if previous_count > 0 {
-                    self.0.push(previous_count | if previous_value { 0x80 } else { 0});
+                while previous_count > 0 {
+                    let count = std::cmp::min(125, previous_count);
+                    previous_count -= count;
+                    self.0.push(count | if previous_value { 0x80 } else { 0 });
                 }
                 previous_value = value;
                 previous_count = 1;
             } else {
                 if previous_count > 125 {
-                    self.0.push(125 | if previous_value { 0x80 } else { 0});
+                    self.0.push(125 | if previous_value { 0x80 } else { 0 });
                     previous_count -= 125;
                 }
                 previous_count += 1;
             }
         }
         if previous_count > 0 {
-            self.0.push(previous_count | if previous_value { 0x80 } else { 0});
+            self.0
+                .push(previous_count | if previous_value { 0x80 } else { 0 });
         }
+    }
+
+    pub fn to_image(&self, width: u32, height: u32) -> Option<GrayImage> {
+        let decoded = self.decompress();
+        let buffer_size = (width * height) as usize;
+        if decoded.len() % buffer_size != 0 {
+            // Size does not match
+            return None;
+        }
+        let bpp = decoded.len() / buffer_size;
+        let mut data = vec![0; buffer_size];
+        for (index, value) in decoded.into_iter().enumerate() {
+            if value {
+                data[index % buffer_size] += 1;
+            }
+        }
+        for value in &mut data {
+            let mul: u16 = ((*value as u16) * 255) / (bpp as u16);
+            *value = if mul > 255 { 255 } else { mul as u8 };
+        }
+        GrayImage::from_raw(width, height, data)
+    }
+
+    pub fn from_image(image: &GrayImage, bits_per_pixel: usize) -> CompressedBitstream {
+        let mut compressed = CompressedBitstream::default();
+        for bit in 0..bits_per_pixel {
+            let threshold = (bit * 256) / bits_per_pixel;
+            let threshold = threshold + (256 / (bits_per_pixel * 2));
+            let bitstream = image.pixels().map(|p| p.0[0] as usize >= threshold);
+            compressed.compress_append(bitstream);
+        }
+        compressed
+    }
+
+    pub fn debug_out<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        let mut offset: usize = 0;
+        for b in self.0.iter() {
+            let value = (b & 0x80) != 0;
+            let repeat = (b & 0x7F) as usize;
+            writeln!(w, "{:08X}: {} repeat {}", offset, value, repeat)?;
+            offset += repeat;
+        }
+        Ok(())
     }
 }
 
@@ -97,5 +144,4 @@ fn test_decompress_compress() {
     let input = CompressedBitstream(vec![0x80 | 125, 125, 126]);
     let recompressed = CompressedBitstream::compress(input.decompress().into_iter());
     assert_eq!(input, recompressed);
-
 }

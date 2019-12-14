@@ -3,35 +3,9 @@ use cookie_factory::bytes::*;
 use cookie_factory::combinator::*;
 use cookie_factory::multi::*;
 use cookie_factory::sequence::*;
-use cookie_factory::{GenError, GenResult, SerializeFn, WriteContext};
+use cookie_factory::SerializeFn;
 use image::{Pixel, Rgb, RgbImage};
-use std::io::{Seek, SeekFrom, Write};
-
-fn store_pos64<W: Write + Seek, S: SerializeFn<W>, F: Fn(u64) -> S>(
-    f: F,
-    w: WriteContext<W>,
-) -> Result<(WriteContext<W>, impl SerializeFn<W>), GenError> {
-    let mut w = w;
-    let pos = w.write.seek(SeekFrom::Current(0))?;
-    let w = f(0xDEADBEEF)(w)?;
-    let lam = move |w: WriteContext<W>| {
-        let mut w = w;
-        let saved_position = w.position;
-        let old_pos = w.write.seek(SeekFrom::Current(0))?;
-        let new_pos = w.write.seek(SeekFrom::Start(pos))?;
-        let mut w = f(w.position)(w)?;
-        w.write.seek(SeekFrom::Start(old_pos))?;
-        w.position = saved_position;
-        Ok(w)
-    };
-    Ok((w, lam))
-}
-fn store_pos32<W: Write + Seek, S: SerializeFn<W>, F: Fn(u32) -> S>(
-    f: F,
-    w: WriteContext<W>,
-) -> Result<(WriteContext<W>, impl SerializeFn<W>), GenError> {
-    store_pos64(move |x| f(x as u32), w)
-}
+use std::io::Write;
 
 const PWS_FILE_HEADER_SIZE: u32 = 0x30;
 pub fn gen_pws_file<W: Write + 'static>(file: &PwsFile) -> impl SerializeFn<W> + '_ {

@@ -41,7 +41,7 @@ impl CompressedBitstream {
                 if repeat > ones_remaining {
                     repeat = ones_remaining;
                 }
-                ones_remaining = ones_remaining - repeat;
+                ones_remaining -= repeat;
             }
             while repeat > 0 && index < ret.len() {
                 ret[index] = value;
@@ -51,7 +51,7 @@ impl CompressedBitstream {
         }
         ret
     }
-    pub fn compress(bitstream: &Vec<bool>) -> CompressedBitstream {
+    pub fn compress(bitstream: &[bool]) -> CompressedBitstream {
         /*
          * This implementation is horrible, but it took some convincing to get exactly the same
          * outputs as ChiTuBox. (e.g. the parts after the loop).
@@ -60,7 +60,6 @@ impl CompressedBitstream {
          */
         let mut data = Vec::new();
         let mut num_ones: usize = 0;
-        let mut index = 0;
         let mut last_value = false;
         let mut last_value_count: u8 = 0;
         for b in bitstream.iter() {
@@ -88,7 +87,6 @@ impl CompressedBitstream {
             last_value_count += 1;
             let encoded: u8 = (last_value_count - 1) | (if last_value { 0x80 } else { 0 });
             data.push(encoded.reverse_bits());
-            last_value_count = 0;
         } else if let Some(last) = data.pop() {
             if last == 0xfe {
                 data.push(0x01);

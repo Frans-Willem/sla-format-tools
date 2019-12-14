@@ -1,6 +1,6 @@
 use crate::formats::photons::data::*;
 use crate::parse_rgb565::parse_rgb565_image;
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::RgbImage;
 use nom::{number::complete::*, sequence::tuple, IResult};
 
 fn parse_photons_thumbnail(input: &[u8]) -> IResult<&[u8], RgbImage> {
