@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated with glade 3.22.1 -->
+<interface>
+  <requires lib="gtk+" version="3.20"/>
+  <object class="GtkAdjustment" id="adjustment_drop_speed">
+    <property name="lower">0.01</property>
+    <property name="upper">100</property>
+    <property name="value">2.5</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="adjustment_lift_distance">
+    <property name="upper">100</property>
+    <property name="value">6</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="adjustment_lift_speed">
+    <property name="lower">0.01</property>
+    <property name="upper">100</property>
+    <property name="value">1.5</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkFileFilter" id="filefilter_sl1">
+    <patterns>
+      <pattern>*.sl1</pattern>
+    </patterns>
+  </object>
+  <object class="GtkListStore" id="liststore_antialias_values">
+    <columns>
+      <!-- column-name antialias -->
+      <column type="guint"/>
+      <!-- column-name displaystr -->
+      <column type="gchararray"/>
+    </columns>
+    <data>
+      <row>
+        <col id="0">1</col>
+        <col id="1" translatable="yes">1</col>
+      </row>
+      <row>
+        <col id="0">2</col>
+        <col id="1" translatable="yes">2</col>
+      </row>
+      <row>
+        <col id="0">4</col>
+        <col id="1" translatable="yes">4</col>
+      </row>
+      <row>
+        <col id="0">8</col>
+        <col id="1" translatable="yes">8</col>
+      </row>
+    </data>
+  </object>
+  <object class="GtkFileChooserDialog" id="filechooserdialog_inputfile">
+    <property name="can_focus">False</property>
+    <property name="title" translatable="yes">Prusa SL1 input file</property>
+    <property name="type_hint">dialog</property>
+    <property name="attached_to">window</property>
+    <property name="filter">filefilter_sl1</property>
+    <child type="titlebar">
+      <placeholder/>
+    </child>
+    <child internal-child="vbox">
+      <object class="GtkBox">
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
+        <child internal-child="action_area">
+          <object class="GtkButtonBox">
+            <property name="can_focus">False</property>
+            <property name="layout_style">end</property>
+            <child>
+              <object class="GtkButton" id="button_open">
+                <property name="label">gtk-open</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_stock">True</property>
+                <property name="image_position">right</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button_cancel">
+                <property name="label">gtk-cancel</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_stock">True</property>
+                <property name="image_position">right</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <placeholder/>
+        </child>
+      </object>
+    </child>
+    <action-widgets>
+      <action-widget response="-5">button_open</action-widget>
+      <action-widget response="-6">button_cancel</action-widget>
+    </action-widgets>
+  </object>
+  <object class="GtkApplicationWindow" id="window">
+    <property name="can_focus">False</property>
+    <property name="title" translatable="yes">Prusa SL1 to Anycubic PWS converter</property>
+    <property name="show_menubar">False</property>
+    <child>
+      <placeholder/>
+    </child>
+    <child>
+      <object class="GtkGrid">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="margin_left">8</property>
+        <property name="margin_right">8</property>
+        <property name="margin_top">8</property>
+        <property name="margin_bottom">8</property>
+        <property name="row_spacing">8</property>
+        <property name="column_spacing">8</property>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Input file:</property>
+            <property name="xalign">1</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Anti-aliasing:</property>
+            <property name="xalign">1</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkComboBox">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="hexpand">True</property>
+            <property name="model">liststore_antialias_values</property>
+            <property name="active">0</property>
+            <property name="id_column">0</property>
+            <property name="active_id">0</property>
+            <child>
+              <object class="GtkCellRendererText"/>
+              <attributes>
+                <attribute name="text">1</attribute>
+              </attributes>
+            </child>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Lift distance (mm):</property>
+            <property name="xalign">1</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">2</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkSpinButton">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="hexpand">True</property>
+            <property name="input_purpose">number</property>
+            <property name="adjustment">adjustment_lift_distance</property>
+            <property name="digits">2</property>
+            <property name="numeric">True</property>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">2</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkFileChooserButton">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="hexpand">True</property>
+            <property name="dialog">filechooserdialog_inputfile</property>
+            <property name="title" translatable="yes">Prusa SL1 input file</property>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Lift speed (mm/s):</property>
+            <property name="xalign">1</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">3</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">Drop distance (mm/s):</property>
+            <property name="xalign">1</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">4</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkSpinButton">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="hexpand">True</property>
+            <property name="text" translatable="yes">6.00</property>
+            <property name="input_purpose">number</property>
+            <property name="adjustment">adjustment_lift_speed</property>
+            <property name="digits">2</property>
+            <property name="numeric">True</property>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">3</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkSpinButton">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="hexpand">True</property>
+            <property name="text" translatable="yes">6.00</property>
+            <property name="input_purpose">number</property>
+            <property name="adjustment">adjustment_drop_speed</property>
+            <property name="digits">2</property>
+            <property name="numeric">True</property>
+          </object>
+          <packing>
+            <property name="left_attach">1</property>
+            <property name="top_attach">4</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton">
+            <property name="label">gtk-convert</property>
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="receives_default">True</property>
+            <property name="use_stock">True</property>
+          </object>
+          <packing>
+            <property name="left_attach">0</property>
+            <property name="top_attach">5</property>
+            <property name="width">2</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
